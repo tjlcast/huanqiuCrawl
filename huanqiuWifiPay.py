@@ -11,11 +11,14 @@ import json
 import base64
 import hashlib
 import re
+import testData
 import time
 import sys
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
+
+# error
 ERROR_TASK_CONTENT= 12
 ERROR_DATA_NONE = 24
 ERROR_UNKNOWN_TYPE = 25
@@ -61,10 +64,11 @@ class Message:
 class VerifyMessage(Message):
     def __init__(self):
         self.message = """<request><header><accountId>{accountId}</accountId><serviceName>{serviceName}</serviceName><requestTime>{requestTime}</requestTime><version>{version}</version><sign>{sign}</sign></header><body><productId>{productId}</productId><price>{price}</price><count>{count}</count><contactName>{contactName}</contactName><contactMobile>{contacntMobile}</contactMobile><useDate>{useDate}</useDate><useEndDate>{useEndDate}</useEndDate><extendInfo><takeAddress>{takeAddress}</takeAddress><returnAddress>{returnAddress}</returnAddress><deliveryMessages>{deliveryMessage}</deliveryMessages></extendInfo></body></request>"""
+        self.message = self.message.replace(' ', '').replace('\n', '').replace('\t', '')
 
     def _addDeliveryMessage(self, data):
         totalStr = ''
-        for deliver in data.get('delivers'):
+        for deliver in data:
             tempStr = """<deliveryMessage><province>{province}</province><city>{city}</city><district>{district}</district><address>{address}</address></deliveryMessage>"""
             tempStr.format('province', deliver.get('province'))
             tempStr.format('city', deliver.get('city'))
@@ -76,23 +80,23 @@ class VerifyMessage(Message):
 
     def formatMessage(self, data):
         # header 填充
-        self.message.format('accountId', data.get('accountId'))
-        self.message.format('serviceName', data.get('serviceName'))
-        self.message.format('requestTime', data.get('requestTime'))
-        self.message.format('version', data.get('version'))
+        self.message.replace('{accountId}', data.get('header').get('accountId'))
+        self.message.format('serviceName', data.get('header').get('serviceName'))
+        self.message.format('requestTime', data.get('header').get('requestTime'))
+        self.message.format('version', data.get('header').get('version'))
 
         # body 填充
-        self.message.format('productId', data.get('productId'))
-        self.message.format('price', data.get('price'))
-        self.message.format('contactName', data.get('contactName'))
-        self.message.format('contactMobile', data.get('contactMobile'))
-        self.message.format('useDate', data.get('useDate'))
-        self.message.format('useEndDate', data.get('useEndDate'))
+        self.message.format('productId', data.get('body').get('productId'))
+        self.message.format('price', data.get('body').get('price'))
+        self.message.format('contactName', data.get('body').get('contactName'))
+        self.message.format('contactMobile', data.get('body').get('contactMobile'))
+        self.message.format('useDate', data.get('body').get('useDate'))
+        self.message.format('useEndDate', data.get('body').get('useEndDate'))
 
         # 额外信息 填充
-        self.message.fromat('takeAddress', data.get('takeAddress'))
-        self.message.format('returnAddress', data.get('returnAddress'))
-        self._addDeliveryMessage(data)
+        self.message.fromat('takeAddress', data.get('extendInfo').get('takeAddress'))
+        self.message.format('returnAddress', data.get('extendInfo').get('returnAddress'))
+        self._addDeliveryMessage(data.get('deliveryMessage'))
 
         #encode
         self._bodyEnBase64()
@@ -106,7 +110,7 @@ class VerifyMessage(Message):
 
 
 
-class CreateMessage:
+class CreateMessage(Message):
     def __init__(self):
         self.message = """<request><header><accountId>{accountId}</accountId><serviceName>{serviceName}</serviceName><requestTime>{requestTime}</requestTime><version>{version}</version><sign>{sign}</sign></header><body><productId>{productId}</productId><price>{price}</price><count>{count}</count><contactName>{contactName}</contactName><contactMobile>{contacntMobile}</contactMobile><useDate>{useDate}</useDate><useEndDate>{useEndDate}</useEndDate><extendInfo><takeAddress>{takeAddress}</takeAddress><returnAddress>{returnAddress}</returnAddress><deliveryMessages>{deliveryMessage}</deliveryMessages></extendInfo></body></request>"""
         self.message = """
@@ -142,10 +146,11 @@ class CreateMessage:
         </body>
         </request>
         """
+        self.message = self.message.replace(' ', '').replace('\n', '').replace('\t', '')
 
     def _addDeliveryMessage(self, data):
         totalStr = ''
-        for deliver in data.get('delivers'):
+        for deliver in data:
             tempStr = """<deliveryMessage><province>{province}</province><city>{city}</city><district>{district}</district><address>{address}</address></deliveryMessage>"""
             tempStr.format('province', deliver.get('province'))
             tempStr.format('city', deliver.get('city'))
@@ -180,7 +185,7 @@ class CreateMessage:
         self.message.format('disAmount', data.get('disAmount'))
         self.message.format('getAddress', data.get('getAddress'))
         self.message.format('returnAddress', data.get('returnAddress'))
-        self._addDeliveryMessage(data)
+        self._addDeliveryMessage(data.get('deliveryMessage'))
 
         #encode
         self._bodyEnBase64()
@@ -193,7 +198,7 @@ class CreateMessage:
         self.message.format('sign', sign)
 
 
-class CancelMessage:
+class CancelMessage(Message):
     def __init__(self):
         self.messge = """
         <request>
@@ -212,6 +217,7 @@ class CancelMessage:
         </body>
         </request>
         """
+        self.message = self.message.replace(' ', '').replace('\n', '').replace('\t', '')
 
     def formatMessage(self, data):
         # header 填充
@@ -237,9 +243,9 @@ class CancelMessage:
         self.message.format('sign', sign)
 
 
-class QueryMessage:
+class QueryMessage(Message):
     def __init__(self):
-        self.messge = """
+        self.message = """
             <request>
             <header>
                 <accountId>{account}</accountId>
@@ -254,6 +260,7 @@ class QueryMessage:
             </body>
             </request>
             """
+        self.message = self.message.replace(' ', '').replace('\n', '').replace('\t', '')
 
     def formatMessage(self, data):
         # header 填充
@@ -285,23 +292,65 @@ class API :
         self.version = '2.0'
         self.requestTime = ''
 
-    def verifyOrder(self):
+        self.errorCode = 0
+        self.data = None
+
+    def _verifyOrder(self, data):
+        message = VerifyMessage()
+        sendStr = message.getMessage(data)
+        print sendStr
+        self._requestAction(self._url, sendStr)
         pass
 
-    def creatOrder(self):
+    def _creatOrder(self, data):
+        message = CreateMessage()
+        sendStr = message.getMessage(data)
+        print sendStr
+        self._requestAction(self._url, sendStr)
         pass
 
-    def CancelOrder(self):
+    def _CancelOrder(self):
         pass
 
-    def QueryOrder(self):
+    def _QueryOrder(self, data):
+        message = QueryMessage()
+        sendStr = message.getMessage(data)
+        self._requestAction(self._url, sendStr)
         pass
 
-    def requestAction(self, data):
+    def _requestAction(self, url, sendStr):
+        header = {'Content-Type': 'text/xml'}
+        returnStr = requests.post(url, headers=header, data=sendStr)
+        return
+
+    def init_pay_info(self, data):
+        result = {'error': '1', 'msg': 'init_pay_info failed!'}
+        try:
+            self.data = data
+        except Exception, e:
+            result['msg'] = 'init_pay_info failed, look at the log file in detail'
+            raise
+        return result
+
+    def create_order(self):
+        assert self.data != None
+
+        self._verifyOrder(self.data['verifyData'])
+        #验证成功后
+        self._creatOrder(self.data['createData'])
+
+
+    def do_charge(self, data):
         pass
 
 def NoticeOrderConsumed(data):
     pass
 
 if __name__ == '__main__' :
-    pass
+    data = {
+        'verifyData': testData.VerifyTestData,
+        'createData': testData.CreateTestData
+    }
+    api = API()
+    api.init_pay_info(data)
+    api.create_order()
