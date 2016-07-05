@@ -261,6 +261,7 @@ class API :
         self.data = None
 
     def _verifyOrder(self, data):
+        # 需要对传入的data进行解析,并装配为标准格式
         message = VerifyMessage()
         sendStr = message.getMessage(data)
         print sendStr
@@ -268,6 +269,7 @@ class API :
         pass
 
     def _creatOrder(self, data):
+        # 需要对传入的data进行解析,并装配为标准格式
         message = CreateMessage()
         sendStr = message.getMessage(data)
         print sendStr
@@ -275,9 +277,11 @@ class API :
         pass
 
     def _CancelOrder(self):
+        # 需要对传入的data进行解析,并装配为标准格式
         pass
 
     def _QueryOrder(self, data):
+        # 需要对传入的data进行解析,并装配为标准格式
         message = QueryMessage()
         sendStr = message.getMessage(data)
         self._requestAction(self._url, sendStr)
@@ -286,7 +290,7 @@ class API :
     def _requestAction(self, url, sendStr):
         header = {'Content-Type': 'text/xml'}
         returnStr = requests.post(url, headers=header, data=sendStr)
-        return
+        return returnStr
 
     def init_pay_info(self, data):
         result = {'error': '1', 'msg': 'init_pay_info failed!'}
@@ -308,8 +312,8 @@ class API :
     def do_charge(self, data):
         pass
 
-def NoticeOrderConsumed(data):
-    pass
+    def NoticeOrderConsumed(self, data):
+        pass
 
 if __name__ == '__main__' :
     data = {
