@@ -50,8 +50,8 @@ class Message:
         # encode(64)
         codedBody = base64.b64encode(body)
         # 替换原body
-        tempStr = "<body>{content}</body>".format('content', codedBody)
-        pattern_body.sub(tempStr, self.message)
+        tempStr = "<body>{content}</body>".format(content=codedBody)
+        self.message = pattern_body.sub(tempStr, self.message)
 
     def formatMessage(self, data):
         pass
@@ -63,56 +63,43 @@ class Message:
 
 class VerifyMessage(Message):
     def __init__(self):
-        self.message = """<request><header><accountId>{accountId}</accountId><serviceName>{serviceName}</serviceName><requestTime>{requestTime}</requestTime><version>{version}</version><sign>{sign}</sign></header><body><productId>{productId}</productId><price>{price}</price><count>{count}</count><contactName>{contactName}</contactName><contactMobile>{contacntMobile}</contactMobile><useDate>{useDate}</useDate><useEndDate>{useEndDate}</useEndDate><extendInfo><takeAddress>{takeAddress}</takeAddress><returnAddress>{returnAddress}</returnAddress><deliveryMessages>{deliveryMessage}</deliveryMessages></extendInfo></body></request>"""
+        self.message = """<request><header><accountId>{accountId}</accountId><serviceName>{serviceName}</serviceName><requestTime>{requestTime}</requestTime><version>{version}</version><sign>{sign}</sign></header><body><productId>{productId}</productId><price>{price}</price><count>{count}</count><contactName>{contactName}</contactName><contactMobile>{contactMobile}</contactMobile><useDate>{useDate}</useDate><useEndDate>{useEndDate}</useEndDate><extendInfo><takeAddress>{takeAddress}</takeAddress><returnAddress>{returnAddress}</returnAddress><deliveryMessages>{deliveryMessage}</deliveryMessages></extendInfo></body></request>"""
         self.message = self.message.replace(' ', '').replace('\n', '').replace('\t', '')
 
     def _addDeliveryMessage(self, data):
         totalStr = ''
         for deliver in data:
             tempStr = """<deliveryMessage><province>{province}</province><city>{city}</city><district>{district}</district><address>{address}</address></deliveryMessage>"""
-            tempStr.format('province', deliver.get('province'))
-            tempStr.format('city', deliver.get('city'))
-            tempStr.format('district', deliver.get('district'))
-            tempStr.format('address', deliver.get('address'))
-            totalStr = totalStr + tempStr
+            totalStr = totalStr + tempStr.format(**deliver)
 
-        self.message.format('deliveryMessage', totalStr)
+        return totalStr
 
     def formatMessage(self, data):
-        # header 填充
-        self.message.replace('{accountId}', data.get('header').get('accountId'))
-        self.message.format('serviceName', data.get('header').get('serviceName'))
-        self.message.format('requestTime', data.get('header').get('requestTime'))
-        self.message.format('version', data.get('header').get('version'))
+        # 封装'deliveryMessage'的数据
+        tempDeliveryMessage = self._addDeliveryMessage(data.get('deliveryMessage'))
+        # 得到header body extendInfo deliveryMessage的 封装数据
+        infoDict = dict(data.get('header').items() + data.get('body').items() + data.get('extendInfo').items())
+        infoDict['deliveryMessage'] = tempDeliveryMessage
 
-        # body 填充
-        self.message.format('productId', data.get('body').get('productId'))
-        self.message.format('price', data.get('body').get('price'))
-        self.message.format('contactName', data.get('body').get('contactName'))
-        self.message.format('contactMobile', data.get('body').get('contactMobile'))
-        self.message.format('useDate', data.get('body').get('useDate'))
-        self.message.format('useEndDate', data.get('body').get('useEndDate'))
-
-        # 额外信息 填充
-        self.message.fromat('takeAddress', data.get('extendInfo').get('takeAddress'))
-        self.message.format('returnAddress', data.get('extendInfo').get('returnAddress'))
-        self._addDeliveryMessage(data.get('deliveryMessage'))
+        try:
+            self.message = self.message.format(**infoDict)
+        except Exception, e:
+            logger.error('VeriyMessage: format message occur error(%s)!' % e)
 
         #encode
         self._bodyEnBase64()
 
         #签名 填充
         body_content = self._getBodyContent()
-        tempStr = data.get('accountId') + data.get("serviceName") + data.get("requestTime") + data.get("version") + body_content
+        tempStr = data.get('header').get('accountId') + data.get('header').get("serviceName") + data.get('header').get("requestTime") + data.get('header').get("version") + body_content
         hash_md5 = hashlib.md5(tempStr)
         sign = (hash_md5.hexdigest()).lower()
-        self.message.format('sign', sign)
-
+        self.message = self.message.replace('<sign></sign>', '<sign>'+sign+'</sign>')
 
 
 class CreateMessage(Message):
     def __init__(self):
-        self.message = """<request><header><accountId>{accountId}</accountId><serviceName>{serviceName}</serviceName><requestTime>{requestTime}</requestTime><version>{version}</version><sign>{sign}</sign></header><body><productId>{productId}</productId><price>{price}</price><count>{count}</count><contactName>{contactName}</contactName><contactMobile>{contacntMobile}</contactMobile><useDate>{useDate}</useDate><useEndDate>{useEndDate}</useEndDate><extendInfo><takeAddress>{takeAddress}</takeAddress><returnAddress>{returnAddress}</returnAddress><deliveryMessages>{deliveryMessage}</deliveryMessages></extendInfo></body></request>"""
+        self.message = """<request><header><accountId>{accountId}</accountId><serviceName>{serviceName}</serviceName><requestTime>{requestTime}</requestTime><version>{version}</version><sign>{sign}</sign></header><body><productId>{productId}</productId><price>{price}</price><count>{count}</count><contactName>{contactName}</contactName><contactMobile>{contactMobile}</contactMobile><useDate>{useDate}</useDate><useEndDate>{useEndDate}</useEndDate><extendInfo><takeAddress>{takeAddress}</takeAddress><returnAddress>{returnAddress}</returnAddress><deliveryMessages>{deliveryMessage}</deliveryMessages></extendInfo></body></request>"""
         self.message = """
         <request>
         <header>
@@ -152,50 +139,32 @@ class CreateMessage(Message):
         totalStr = ''
         for deliver in data:
             tempStr = """<deliveryMessage><province>{province}</province><city>{city}</city><district>{district}</district><address>{address}</address></deliveryMessage>"""
-            tempStr.format('province', deliver.get('province'))
-            tempStr.format('city', deliver.get('city'))
-            tempStr.format('district', deliver.get('district'))
-            tempStr.format('address', deliver.get('address'))
-            totalStr = totalStr + tempStr
+            totalStr = totalStr + tempStr.format(**deliver)
 
-        self.message.format('deliveryMessage', totalStr)
+        return totalStr
 
     def formatMessage(self, data):
-        # header 填充
-        self.message.format('accountId', data.get('accountId'))
-        self.message.format('serviceName', data.get('serviceName'))
-        self.message.format('requestTime', data.get('requestTime'))
-        self.message.format('version', data.get('version'))
+        # 封装'deliveryMessage'的数据
+        tempDeliveryMessage = self._addDeliveryMessage(data.get('deliveryMessage'))
+        # 得到header body extendInfo deliveryMessage的 封装数据
+        infoDict = dict(data.get('header').items() + data.get('body').items() + data.get('extendInfo').items())
+        infoDict['deliveryMessage'] = tempDeliveryMessage
 
-        # body 填充
-        self.message.format('otaOrderId', data.get('otaOrderId'))
-        self.message.format('productId', data.get('productId'))
-        self.message.format('otaProductName', data.get('otaProductName'))
-        self.message.format('price', data.get('price'))
-        self.message.format('count', data.get('count'))
-        self.message.format('contactName', data.get('contactName'))
-        self.message.format('contactMobile', data.get('contactMobile'))
-        self.message.format('useDate', data.get('useDate'))
-        self.message.format('useEndDate', data.get('useEndDate'))
-        self.message.format('remark', data.get('remark'))
+        try:
+            self.message = self.message.format(**infoDict)
+        except Exception, e:
+            logger.error('CreateOrderMessage: format message occur error(%s)!' % e)
 
-        # 额外信息 填充
-        self.message.format('deposit', data.get('desposit'))
-        self.message.format('depostiMode', data.get('depostiMode'))
-        self.message.format('disAmount', data.get('disAmount'))
-        self.message.format('getAddress', data.get('getAddress'))
-        self.message.format('returnAddress', data.get('returnAddress'))
-        self._addDeliveryMessage(data.get('deliveryMessage'))
-
-        #encode
+        # encode
         self._bodyEnBase64()
 
-        #签名 填充
+        # 签名 填充
         body_content = self._getBodyContent()
-        tempStr = data.get('accountId') + data.get("serviceName") + data.get("requestTime") + data.get("version") + body_content
+        tempStr = data.get('header').get('accountId') + data.get('header').get("serviceName") + data.get('header').get(
+            "requestTime") + data.get('header').get("version") + body_content
         hash_md5 = hashlib.md5(tempStr)
         sign = (hash_md5.hexdigest()).lower()
-        self.message.format('sign', sign)
+        self.message = self.message.replace('<sign></sign>', '<sign>' + sign + '</sign>')
 
 
 class CancelMessage(Message):
@@ -220,27 +189,24 @@ class CancelMessage(Message):
         self.message = self.message.replace(' ', '').replace('\n', '').replace('\t', '')
 
     def formatMessage(self, data):
-        # header 填充
-        self.message.format('accountId', data.get('accountId'))
-        self.message.format('serviceName', data.get('serviceName'))
-        self.message.format('requestTime', data.get('requestTime'))
-        self.message.format('version', data.get('version'))
+        # 得到header body的 封装数据
+        infoDict = dict(data.get('header').items() + data.get('body').items())
 
-        # body 填充
-        self.message.format('otaOrderId', data.get('otaOrderId'))
-        self.message.format('vendorOrderId', data.get('vendorOrderId'))
-        self.message.format('sequenceId', data.get('sequenceId'))
-        self.message.format('cancelCount', data.get('cancelCount'))
+        try:
+            self.message = self.message.format(**infoDict)
+        except Exception, e:
+            logger.error('CancelOrderMessage: format message occur error(%s)!' % e)
 
-        #encode
+        # encode
         self._bodyEnBase64()
 
-        #签名 填充
+        # 签名 填充
         body_content = self._getBodyContent()
-        tempStr = data.get('accountId') + data.get("serviceName") + data.get("requestTime") + data.get("version") + body_content
+        tempStr = data.get('header').get('accountId') + data.get('header').get("serviceName") + data.get('header').get(
+            "requestTime") + data.get('header').get("version") + body_content
         hash_md5 = hashlib.md5(tempStr)
         sign = (hash_md5.hexdigest()).lower()
-        self.message.format('sign', sign)
+        self.message = self.message.replace('<sign></sign>', '<sign>' + sign + '</sign>')
 
 
 class QueryMessage(Message):
@@ -263,25 +229,24 @@ class QueryMessage(Message):
         self.message = self.message.replace(' ', '').replace('\n', '').replace('\t', '')
 
     def formatMessage(self, data):
-        # header 填充
-        self.message.format('accountId', data.get('accountId'))
-        self.message.format('serviceName', data.get('serviceName'))
-        self.message.format('requestTime', data.get('requestTime'))
-        self.message.format('version', data.get('version'))
+        # 得到header body的 封装数据
+        infoDict = dict(data.get('header').items() + data.get('body').items())
 
-        # body 填充
-        self.message.format('otaOrderId', data.get('otaOrderId'))
-        self.message.format('vendorOrderId', data.get('vendorOrderId'))
+        try:
+            self.message = self.message.format(**infoDict)
+        except Exception, e:
+            logger.error('QueryOrderMessage: format message occur error(%s)!' % e)
 
-        #encode
+        # encode
         self._bodyEnBase64()
 
-        #签名 填充
+        # 签名 填充
         body_content = self._getBodyContent()
-        tempStr = data.get('accountId') + data.get("serviceName") + data.get("requestTime") + data.get("version") + body_content
+        tempStr = data.get('header').get('accountId') + data.get('header').get("serviceName") + data.get('header').get(
+            "requestTime") + data.get('header').get("version") + body_content
         hash_md5 = hashlib.md5(tempStr)
         sign = (hash_md5.hexdigest()).lower()
-        self.message.format('sign', sign)
+        self.message = self.message.replace('<sign></sign>', '<sign>' + sign + '</sign>')
 
 
 class API :
