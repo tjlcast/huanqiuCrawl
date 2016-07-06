@@ -33,6 +33,7 @@ pattern_body_content = re.compile(r"<body>(.*)</body>")
 class Message:
     def __init__(self):
         self.message = ''
+        self.errorCode = 0
 
     def _getBodyContent(self):
         # 返回body节点的内容
@@ -58,7 +59,7 @@ class Message:
 
     def getMessage(self, data):
         self.formatMessage(data)
-        return self.message
+        return self.message, self.errorCode
 
 
 class VerifyMessage(Message):
@@ -71,35 +72,42 @@ class VerifyMessage(Message):
         for deliver in data:
             tempStr = """<deliveryMessage><province>{province}</province><city>{city}</city><district>{district}</district><address>{address}</address></deliveryMessage>"""
             totalStr = totalStr + tempStr.format(**deliver)
-
         return totalStr
 
     def formatMessage(self, data):
         # 封装'deliveryMessage'的数据
-        tempDeliveryMessage = self._addDeliveryMessage(data.get('deliveryMessage'))
-        # 得到header body extendInfo deliveryMessage的 封装数据
-        infoDict = dict(data.get('header').items() + data.get('body').items() + data.get('extendInfo').items())
-        infoDict['deliveryMessage'] = tempDeliveryMessage
-
         try:
+            tempDeliveryMessage = self._addDeliveryMessage(data.get('deliveryMessage'))
+            # 得到header body extendInfo deliveryMessage的 封装数据
+            infoDict = dict(data.get('header').items() + data.get('body').items() + data.get('extendInfo').items())
+            infoDict['deliveryMessage'] = tempDeliveryMessage
             self.message = self.message.format(**infoDict)
         except Exception, e:
-            logger.error('VeriyMessage: format message occur error(%s)!' % e)
+            self.errorCode = 1
+            logger.error('VeriyMessage: error occured in generating message dict! (%s)' % e)
 
         #encode
-        self._bodyEnBase64()
+        try:
+            self._bodyEnBase64()
+        except Exception, e:
+            self.errorCode = 1
+            logger.error('VeriyMessage: messaeg encode base64 wrongly! (%s)' % e)
 
         #签名 填充
-        body_content = self._getBodyContent()
-        tempStr = data.get('header').get('accountId') + data.get('header').get("serviceName") + data.get('header').get("requestTime") + data.get('header').get("version") + body_content
-        hash_md5 = hashlib.md5(tempStr)
-        sign = (hash_md5.hexdigest()).lower()
-        self.message = self.message.replace('<sign></sign>', '<sign>'+sign+'</sign>')
+        try:
+            body_content = self._getBodyContent()
+            tempStr = data.get('header').get('accountId') + data.get('header').get("serviceName") + data.get(
+                'header').get("requestTime") + data.get('header').get("version") + body_content
+            hash_md5 = hashlib.md5(tempStr)
+            sign = (hash_md5.hexdigest()).lower()
+            self.message = self.message.replace('<sign></sign>', '<sign>' + sign + '</sign>')
+        except Exception, e:
+            self.errorCode = 1
+            logger.error('VeriyMessage: error occured in generating sign! (%s)' % e)
 
 
 class CreateMessage(Message):
     def __init__(self):
-        self.message = """<request><header><accountId>{accountId}</accountId><serviceName>{serviceName}</serviceName><requestTime>{requestTime}</requestTime><version>{version}</version><sign>{sign}</sign></header><body><productId>{productId}</productId><price>{price}</price><count>{count}</count><contactName>{contactName}</contactName><contactMobile>{contactMobile}</contactMobile><useDate>{useDate}</useDate><useEndDate>{useEndDate}</useEndDate><extendInfo><takeAddress>{takeAddress}</takeAddress><returnAddress>{returnAddress}</returnAddress><deliveryMessages>{deliveryMessage}</deliveryMessages></extendInfo></body></request>"""
         self.message = """
         <request>
         <header>
@@ -140,31 +148,44 @@ class CreateMessage(Message):
         for deliver in data:
             tempStr = """<deliveryMessage><province>{province}</province><city>{city}</city><district>{district}</district><address>{address}</address></deliveryMessage>"""
             totalStr = totalStr + tempStr.format(**deliver)
-
         return totalStr
 
     def formatMessage(self, data):
         # 封装'deliveryMessage'的数据
-        tempDeliveryMessage = self._addDeliveryMessage(data.get('deliveryMessage'))
-        # 得到header body extendInfo deliveryMessage的 封装数据
-        infoDict = dict(data.get('header').items() + data.get('body').items() + data.get('extendInfo').items())
-        infoDict['deliveryMessage'] = tempDeliveryMessage
+        try:
+            tempDeliveryMessage = self._addDeliveryMessage(data.get('deliveryMessage'))
+            # 得到header body extendInfo deliveryMessage的 封装数据
+            infoDict = dict(data.get('header').items() + data.get('body').items() + data.get('extendInfo').items())
+            infoDict['deliveryMessage'] = tempDeliveryMessage
+        except Exception, e:
+            self.errorCode = 1
+            logger.error("CreateMessage: error occured in generating message dict! (%s)" % e)
 
         try:
             self.message = self.message.format(**infoDict)
         except Exception, e:
+            self.errorCode = 1
             logger.error('CreateOrderMessage: format message occur error(%s)!' % e)
 
         # encode
-        self._bodyEnBase64()
+        try:
+            self._bodyEnBase64()
+        except Exception, e:
+            self.errorCode = 1
+            logger.error('CreateOrderMessage: message encoded base64 wrongly! (%s)' % e)
 
         # 签名 填充
-        body_content = self._getBodyContent()
-        tempStr = data.get('header').get('accountId') + data.get('header').get("serviceName") + data.get('header').get(
-            "requestTime") + data.get('header').get("version") + body_content
-        hash_md5 = hashlib.md5(tempStr)
-        sign = (hash_md5.hexdigest()).lower()
-        self.message = self.message.replace('<sign></sign>', '<sign>' + sign + '</sign>')
+        try:
+            body_content = self._getBodyContent()
+            tempStr = data.get('header').get('accountId') + data.get('header').get("serviceName") + data.get(
+                'header').get(
+                "requestTime") + data.get('header').get("version") + body_content
+            hash_md5 = hashlib.md5(tempStr)
+            sign = (hash_md5.hexdigest()).lower()
+            self.message = self.message.replace('<sign></sign>', '<sign>' + sign + '</sign>')
+        except Exception, e:
+            self.errorCode = 1
+            logger.error('CreateOrderMessage: error occured in generating sign')
 
 
 class CancelMessage(Message):
@@ -190,23 +211,37 @@ class CancelMessage(Message):
 
     def formatMessage(self, data):
         # 得到header body的 封装数据
-        infoDict = dict(data.get('header').items() + data.get('body').items())
+        try:
+            infoDict = dict(data.get('header').items() + data.get('body').items())
+        except Exception, e:
+            self.errorCode = 1
+            logger.error('CancelMessageOrder: error occured in generating message dict! (%s)' % e)
 
         try:
             self.message = self.message.format(**infoDict)
         except Exception, e:
+            self.errorCode = 1
             logger.error('CancelOrderMessage: format message occur error(%s)!' % e)
 
         # encode
-        self._bodyEnBase64()
+        try:
+            self._bodyEnBase64()
+        except Exception, e:
+            self.errorCode = 1
+            logger.error('CancelOrderMessage: message encoded base64 wrongly! (%s)' % e)
 
         # 签名 填充
-        body_content = self._getBodyContent()
-        tempStr = data.get('header').get('accountId') + data.get('header').get("serviceName") + data.get('header').get(
-            "requestTime") + data.get('header').get("version") + body_content
-        hash_md5 = hashlib.md5(tempStr)
-        sign = (hash_md5.hexdigest()).lower()
-        self.message = self.message.replace('<sign></sign>', '<sign>' + sign + '</sign>')
+        try:
+            body_content = self._getBodyContent()
+            tempStr = data.get('header').get('accountId') + data.get('header').get("serviceName") + data.get(
+                'header').get(
+                "requestTime") + data.get('header').get("version") + body_content
+            hash_md5 = hashlib.md5(tempStr)
+            sign = (hash_md5.hexdigest()).lower()
+            self.message = self.message.replace('<sign></sign>', '<sign>' + sign + '</sign>')
+        except Exception, e:
+            self.errorCode = 1
+            logger.error('CancelOrderMessage: error occured in generating sign! (%s)' % e)
 
 
 class QueryMessage(Message):
@@ -230,23 +265,37 @@ class QueryMessage(Message):
 
     def formatMessage(self, data):
         # 得到header body的 封装数据
-        infoDict = dict(data.get('header').items() + data.get('body').items())
+        try:
+            infoDict = dict(data.get('header').items() + data.get('body').items())
+        except Exception, e:
+            self.errorCode = 1
+            logger.error('QueryMessage: error occured in generating message dict! (%s)' % e)
 
         try:
             self.message = self.message.format(**infoDict)
         except Exception, e:
+            self.errorCode = 1
             logger.error('QueryOrderMessage: format message occur error(%s)!' % e)
 
         # encode
-        self._bodyEnBase64()
+        try:
+            self._bodyEnBase64()
+        except Exception, e:
+            self.errorCode = 1
+            logger.error('QueryOrderMessage: error occured in base64 encoding! (%s)' % e)
 
         # 签名 填充
-        body_content = self._getBodyContent()
-        tempStr = data.get('header').get('accountId') + data.get('header').get("serviceName") + data.get('header').get(
-            "requestTime") + data.get('header').get("version") + body_content
-        hash_md5 = hashlib.md5(tempStr)
-        sign = (hash_md5.hexdigest()).lower()
-        self.message = self.message.replace('<sign></sign>', '<sign>' + sign + '</sign>')
+        try:
+            body_content = self._getBodyContent()
+            tempStr = data.get('header').get('accountId') + data.get('header').get("serviceName") + data.get(
+                'header').get(
+                "requestTime") + data.get('header').get("version") + body_content
+            hash_md5 = hashlib.md5(tempStr)
+            sign = (hash_md5.hexdigest()).lower()
+            self.message = self.message.replace('<sign></sign>', '<sign>' + sign + '</sign>')
+        except Exception, e:
+            self.errorCode = 1
+            logger.error('QueryOrderMessage: error occured in generating sign!(%s)' % e)
 
 
 class API :
@@ -260,32 +309,62 @@ class API :
         self.errorCode = 0
         self.data = None
 
-    def _verifyOrder(self, data):
+    def _verifyOrder(self, inputData):
         # 需要对传入的data进行解析,并装配为标准格式
+        data = {
+            'header': '',
+            'body': '',
+            'extendInfo': '',
+            'deliverMessage': ''
+        }
+
         message = VerifyMessage()
-        sendStr = message.getMessage(data)
-        print sendStr
-        self._requestAction(self._url, sendStr)
-        pass
+        sendStr, errorCode = message.getMessage(data)
+        if errorCode != 0:
+            return None
+        rstr = self._requestAction(self._url, sendStr)
+        return rstr
 
-    def _creatOrder(self, data):
+    def _creatOrder(self, inputData):
         # 需要对传入的data进行解析,并装配为标准格式
+        data = {
+            'header': '',
+            'body': '',
+            'extendInfo': '',
+            'deliverMessage': '',
+        }
         message = CreateMessage()
-        sendStr = message.getMessage(data)
-        print sendStr
-        self._requestAction(self._url, sendStr)
-        pass
+        sendStr, errorCode = message.getMessage(data)
+        if errorCode != 0:
+            return None
+        rstr = self._requestAction(self._url, sendStr)
+        return rstr
 
-    def _CancelOrder(self):
+    def _cancelOrder(self, inputData):
         # 需要对传入的data进行解析,并装配为标准格式
-        pass
+        data = {
+            'header': '',
+            'body': '',
+        }
+        message = CancelMessage()
+        sendStr, errorCode = message.getMessage(data)
+        if errorCode != 0 :
+            return None
+        rstr = self._requestAction(self._url, sendStr)
+        return rstr
 
-    def _QueryOrder(self, data):
+    def _queryOrder(self, inputData):
         # 需要对传入的data进行解析,并装配为标准格式
+        data = {
+            'header': '',
+            'body': '',
+        }
         message = QueryMessage()
-        sendStr = message.getMessage(data)
-        self._requestAction(self._url, sendStr)
-        pass
+        sendStr, errorCode = message.getMessage(data)
+        if errorCode != 0:
+            return None
+        rstr = self._requestAction(self._url, sendStr)
+        return rstr
 
     def _requestAction(self, url, sendStr):
         header = {'Content-Type': 'text/xml'}
@@ -302,15 +381,27 @@ class API :
         return result
 
     def create_order(self):
-        assert self.data != None
-
-        self._verifyOrder(self.data['verifyData'])
-        #验证成功后
-        self._creatOrder(self.data['createData'])
-
+        assert self.data != None and self.data.get('verigyData')!=None and self.data.get('createData')!=None
+        # 验证成功后
+        rVerify = self._verifyOrder(self.data['verifyData'])
+            # if !(header > resultCode == '0000' and header > resultMessage == '验证成功'):
+            #       return 下单失败
+        #订单下单
+        rCreate = self._creatOrder(self.data['createData'])
 
     def do_charge(self, data):
+        # 目前环求wifi还未提供do_charge相关业务功能
         pass
+
+    def query_order(self):
+        assert self.data!=None and self.data.get('queryData')!=None
+        #查询订单
+        rQuery = self._queryOrder(self.data['queryData'])
+
+    def cancel_order(self):
+        assert self.data!=None and self.data.get('cancelData')!=None
+        #取消订单
+        rCancel = self._cancelOrder(self.data['cancelData'])
 
     def NoticeOrderConsumed(self, data):
         pass
