@@ -85,6 +85,7 @@ class VerifyMessage(Message):
         except Exception, e:
             self.errorCode = 1
             logger.error('VeriyMessage: error occured in generating message dict! (%s)' % e)
+            return
 
         #encode
         try:
@@ -92,6 +93,7 @@ class VerifyMessage(Message):
         except Exception, e:
             self.errorCode = 1
             logger.error('VeriyMessage: messaeg encode base64 wrongly! (%s)' % e)
+            return
 
         #签名 填充
         try:
@@ -104,6 +106,7 @@ class VerifyMessage(Message):
         except Exception, e:
             self.errorCode = 1
             logger.error('VeriyMessage: error occured in generating sign! (%s)' % e)
+            return
 
 
 class CreateMessage(Message):
@@ -160,12 +163,14 @@ class CreateMessage(Message):
         except Exception, e:
             self.errorCode = 1
             logger.error("CreateMessage: error occured in generating message dict! (%s)" % e)
+            return
 
         try:
             self.message = self.message.format(**infoDict)
         except Exception, e:
             self.errorCode = 1
             logger.error('CreateOrderMessage: format message occur error(%s)!' % e)
+            return
 
         # encode
         try:
@@ -173,6 +178,7 @@ class CreateMessage(Message):
         except Exception, e:
             self.errorCode = 1
             logger.error('CreateOrderMessage: message encoded base64 wrongly! (%s)' % e)
+            return
 
         # 签名 填充
         try:
@@ -186,6 +192,7 @@ class CreateMessage(Message):
         except Exception, e:
             self.errorCode = 1
             logger.error('CreateOrderMessage: error occured in generating sign')
+            return
 
 
 class CancelMessage(Message):
@@ -216,12 +223,14 @@ class CancelMessage(Message):
         except Exception, e:
             self.errorCode = 1
             logger.error('CancelMessageOrder: error occured in generating message dict! (%s)' % e)
+            return
 
         try:
             self.message = self.message.format(**infoDict)
         except Exception, e:
             self.errorCode = 1
             logger.error('CancelOrderMessage: format message occur error(%s)!' % e)
+            return
 
         # encode
         try:
@@ -229,6 +238,7 @@ class CancelMessage(Message):
         except Exception, e:
             self.errorCode = 1
             logger.error('CancelOrderMessage: message encoded base64 wrongly! (%s)' % e)
+            return
 
         # 签名 填充
         try:
@@ -242,6 +252,7 @@ class CancelMessage(Message):
         except Exception, e:
             self.errorCode = 1
             logger.error('CancelOrderMessage: error occured in generating sign! (%s)' % e)
+            return
 
 
 class QueryMessage(Message):
@@ -270,12 +281,14 @@ class QueryMessage(Message):
         except Exception, e:
             self.errorCode = 1
             logger.error('QueryMessage: error occured in generating message dict! (%s)' % e)
+            return
 
         try:
             self.message = self.message.format(**infoDict)
         except Exception, e:
             self.errorCode = 1
             logger.error('QueryOrderMessage: format message occur error(%s)!' % e)
+            return
 
         # encode
         try:
@@ -283,6 +296,7 @@ class QueryMessage(Message):
         except Exception, e:
             self.errorCode = 1
             logger.error('QueryOrderMessage: error occured in base64 encoding! (%s)' % e)
+            return
 
         # 签名 填充
         try:
@@ -296,6 +310,7 @@ class QueryMessage(Message):
         except Exception, e:
             self.errorCode = 1
             logger.error('QueryOrderMessage: error occured in generating sign!(%s)' % e)
+            return 
 
 
 class API :
